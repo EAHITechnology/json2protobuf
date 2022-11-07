@@ -11,13 +11,14 @@ func (k Kind) String() string {
 }
 
 const (
-	Int64Kind  Kind = "int64"
-	Int32Kind  Kind = "int32"
-	FloatKind  Kind = "float"
-	StringKind Kind = "string"
-	BoolKind   Kind = "bool"
-	ArrayKind  Kind = "array"
-	MapKind    Kind = "map"
+	Int64Kind   Kind = "int64"
+	Int32Kind   Kind = "int32"
+	FloatKind   Kind = "float"
+	StringKind  Kind = "string"
+	BoolKind    Kind = "bool"
+	ArrayKind   Kind = "array"
+	MapKind     Kind = "map"
+	ServiceKind Kind = "service"
 )
 
 type Typ struct {
@@ -32,7 +33,20 @@ type Field struct {
 	Type Typ    `json:"type"`
 }
 
-type JsonSchema struct {
+type ServiceDesc struct {
+	Name            string `json:"name"`
+	Input           string `json:"input"`
+	Output          string `json:"output"`
+	ClientStreaming bool   `json:"client_streaming"`
+	ServerStreaming bool   `json:"server_sstreaming"`
+}
+
+type JsonFieldSchema struct {
 	MsgName string  `json:"msg_name"`
 	Fields  []Field `json:"fields"`
+}
+
+type JsonServiceSchema struct {
+	Name         string        `json:"name"`
+	ServiceDescs []ServiceDesc `json:"service_desc"`
 }

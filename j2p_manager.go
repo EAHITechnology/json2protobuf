@@ -1,7 +1,9 @@
 package json2prorobuf
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +56,7 @@ func appendNestedTypeField(msdIdx int, name string, number int32, kind pref.Kind
 	})
 }
 
-func fillingPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number *int32, arrayFlag, mapKeyFlag, mapValFlag bool, pb *descriptorpb.FileDescriptorProto) error {
+func fillingFieldsPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number *int32, arrayFlag, mapKeyFlag, mapValFlag bool, pb *descriptorpb.FileDescriptorProto) error {
 	switch typ {
 	case proto.Int64Kind:
 		if mapKeyFlag {
@@ -127,7 +129,7 @@ func fillingPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number *int3
 		}
 		(*number)++
 	case proto.ArrayKind:
-		return fillingPbSchema(msdIdx, field.Type.ElementType, field, number, true, false, false, pb)
+		return fillingFieldsPbSchema(msdIdx, field.Type.ElementType, field, number, true, false, false, pb)
 	case proto.MapKind:
 		if !strings.HasSuffix(field.Name, "_map") {
 			field.Name = field.Name + "_map"
@@ -150,11 +152,11 @@ func fillingPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number *int3
 				MapEntry: pbproto.Bool(true),
 			},
 		})
-		if err := fillingPbSchema(msdIdx, field.Type.KeyType, field, number, false, true, false, pb); err != nil {
+		if err := fillingFieldsPbSchema(msdIdx, field.Type.KeyType, field, number, false, true, false, pb); err != nil {
 			return err
 		}
 
-		if err := fillingPbSchema(msdIdx, field.Type.ValueType, field, number, false, false, true, pb); err != nil {
+		if err := fillingFieldsPbSchema(msdIdx, field.Type.ValueType, field, number, false, false, true, pb); err != nil {
 			return err
 		}
 		(*number)++
@@ -178,15 +180,33 @@ func fillingPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number *int3
 	return nil
 }
 
-func (jm *Json2PbParserManager) parser(fileName string, schema []proto.JsonSchema) (pref.FileDescriptor, error) {
+func fillingServicesPbSchema(service proto.JsonServiceSchema, pb *descriptorpb.FileDescriptorProto) {
+	pb.Service = append(pb.Service, &descriptorpb.ServiceDescriptorProto{
+		Name:   pbproto.String(service.Name),
+		Method: []*descriptorpb.MethodDescriptorProto{},
+	})
+
+	for _, sd := range service.ServiceDescs {
+		pb.Service[len(pb.Service)-1].Method = append(pb.Service[len(pb.Service)-1].Method, &descriptorpb.MethodDescriptorProto{
+			Name:            pbproto.String(sd.Name),
+			InputType:       pbproto.String(sd.Input),
+			OutputType:      pbproto.String(sd.Output),
+			ClientStreaming: pbproto.Bool(sd.ClientStreaming),
+			ServerStreaming: pbproto.Bool(sd.ServerStreaming),
+		})
+	}
+}
+
+func (jm *Json2PbParserManager) parser(fileName string, fieldSchema []proto.JsonFieldSchema, serviceSchema []proto.JsonServiceSchema) (pref.FileDescriptor, error) {
 	pb := &descriptorpb.FileDescriptorProto{
 		Syntax:      pbproto.String("proto3"),
 		Name:        pbproto.String(fileName),
 		Package:     pbproto.String("common"),
 		MessageType: []*descriptorpb.DescriptorProto{},
+		Service:     []*descriptorpb.ServiceDescriptorProto{},
 	}
 
-	for msdIdx, s := range schema {
+	for msdIdx, s := range fieldSchema {
 		pb.MessageType = append(pb.MessageType, &descriptorpb.DescriptorProto{
 			Name:  pbproto.String(s.MsgName),
 			Field: []*descriptorpb.FieldDescriptorProto{},
@@ -194,11 +214,23 @@ func (jm *Json2PbParserManager) parser(fileName string, schema []proto.JsonSchem
 
 		var number int32 = 1
 		for _, field := range s.Fields {
-			if err := fillingPbSchema(msdIdx, field.Type.Name, field, &number, false, false, false, pb); err != nil {
+			if err := fillingFieldsPbSchema(msdIdx, field.Type.Name, field, &number, false, false, false, pb); err != nil {
 				return nil, err
 			}
 		}
 	}
+
+	for _, service := range serviceSchema {
+		fmt.Println("service!!!!!!!!!!")
+		fillingServicesPbSchema(service, pb)
+	}
+
+	b, err := json.Marshal(pb)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(string(b))
 
 	return protodesc.NewFile(pb, nil)
 }
@@ -246,17 +278,26 @@ func (jm *Json2PbParserManager) Dump(fileName string) (string, error) {
 			}
 			dumpStr += "\t" + value + " " + string(field.FullName().Name()) + " = " + strconv.FormatInt(number, 10) + ";\n"
 		}
+		dumpStr += "}\n\n"
+	}
+
+	for idx := 0; idx < fd.Services().Len(); idx++ {
+		dumpStr += "service " + string(fd.Services().Get(idx).Name()) + " {\n"
+		for midx := 0; midx < fd.Services().Get(idx).Methods().Len(); midx++ {
+			method := fd.Services().Get(idx).Methods().Get(midx)
+			dumpStr += "\trpc " + string(method.Name()) + " (" + string(method.Input().Name()) + ") returns (" + string(method.Output().Name()) + ");\n"
+		}
 		dumpStr += "}\n"
 	}
 
 	return dumpStr, nil
 }
 
-func (jm *Json2PbParserManager) AddItem(fileName string, schema []proto.JsonSchema) error {
+func (jm *Json2PbParserManager) AddItem(fileName string, fieldSchema []proto.JsonFieldSchema, serviceSchema []proto.JsonServiceSchema) error {
 	jm.lock.Lock()
 	defer jm.lock.Unlock()
 
-	fileDescriptor, err := jm.parser(fileName, schema)
+	fileDescriptor, err := jm.parser(fileName, fieldSchema, serviceSchema)
 	if err != nil {
 		return err
 	}
