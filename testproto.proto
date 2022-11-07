@@ -1,0 +1,23 @@
+syntax = "proto3";
+package common;
+
+message Test2 {
+	int64 test2basetype = 1;
+}
+
+message Test3 {
+	int64 test3basetype = 1;
+}
+
+message Test1 {
+	int64 basetype = 1;
+	repeated string arraytype = 2;
+	map<string,float> mapType = 3;
+	Test2 messageType = 4;
+	repeated Test2 messageArrayType = 5;
+	map<string,Test3> messageMapType = 6;
+}
+
+service Say {
+	rpc Hi (Test3) returns (Test1);
+}

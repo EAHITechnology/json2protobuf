@@ -1,7 +1,6 @@
 package json2prorobuf
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -224,13 +223,6 @@ func (jm *Json2PbParserManager) parser(fileName string, fieldSchema []proto.Json
 		fmt.Println("service!!!!!!!!!!")
 		fillingServicesPbSchema(service, pb)
 	}
-
-	b, err := json.Marshal(pb)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(string(b))
 
 	return protodesc.NewFile(pb, nil)
 }
