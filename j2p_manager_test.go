@@ -82,7 +82,13 @@ func TestNewFieldJson2PbParserManager(t *testing.T) {
 			},
 		},
 	})
-	err := j2pManager.AddItem("testproto.proto", jss, nil)
+
+	desc := proto.JsonProtoDesc{
+		Pkg:          "common",
+		GoPkg:        "./json2prorobuf",
+		FieldSchemas: jss,
+	}
+	err := j2pManager.AddItem("testproto.proto", desc)
 	assert.Equal(t, nil, err)
 
 	str, err := j2pManager.Dump("testproto.proto")
@@ -178,7 +184,14 @@ func TestNewServiceJson2PbParserManager(t *testing.T) {
 		},
 	})
 
-	err := j2pManager.AddItem("testproto.proto", jss, ss)
+	desc := proto.JsonProtoDesc{
+		Pkg:            "common",
+		GoPkg:          "./json2prorobuf",
+		FieldSchemas:   jss,
+		ServiceSchemas: ss,
+	}
+
+	err := j2pManager.AddItem("testproto.proto", desc)
 	assert.Equal(t, nil, err)
 
 	str, err := j2pManager.Dump("testproto.proto")

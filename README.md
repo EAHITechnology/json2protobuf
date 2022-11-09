@@ -14,85 +14,76 @@ import (
 )
 
 func main() {
-    j2pManager := json2prorobuf.NewJson2PbParserManager()
-    
-    schema := []proto.JsonSchema{}
-    schema = append(schema, proto.JsonSchema{
-		MsgName: "Test2",
+    j2pManager := NewJson2PbParserManager()
+
+	jss := []proto.JsonFieldSchema{}
+	jss = append(jss, proto.JsonFieldSchema{
+		MsgName: "TestField",
 		Fields: []proto.Field{
-		    {
-			    Name: "test2basetype",
-			    Type: proto.Typ{
-				      Name: proto.Int64Kind,
-			    },
-		    },
+			{
+				Name: "testfieldtype",
+				Type: proto.Typ{
+					Name: proto.Int64Kind,
+				},
+			},
 		},
 	})
-    
-    schema = append(schema, proto.JsonSchema{
-        MsgName: "Test3",
+	jss = append(jss, proto.JsonFieldSchema{
+		MsgName: "Test",
 		Fields: []proto.Field{
-		    {
-			    Name: "test3basetype",
-			    Type: proto.Typ {
-				    Name: proto.Int64Kind,
-			    },
-		    },
-		},
-    })
-    
-    schema = append(schema, proto.JsonSchema{
-		MsgName: "Test1",
-   		Fields: []proto.Field{
 			{
-			    Name: "basetype",
-			    Type: proto.Typ {
-			        Name: proto.Int64Kind,
-			    },
+				Name: "basetype",
+				Type: proto.Typ{
+					Name: proto.Int64Kind,
+				},
 			},
 			{
-			    Name: "arraytype",
-			    Type: proto.Typ {
-			        Name:        proto.ArrayKind,
-			        ElementType: proto.StringKind,
-			    },
+				Name: "arraytype",
+				Type: proto.Typ{
+					Name:        proto.ArrayKind,
+					ElementType: proto.StringKind,
+				},
 			},
 			{
 				Name: "mapType",
-				Type: proto.Typ {
-				    Name:      "map",
-				    KeyType:   proto.StringKind,
-				    ValueType: proto.FloatKind,
+				Type: proto.Typ{
+					Name:      "map",
+					KeyType:   proto.StringKind,
+					ValueType: proto.FloatKind,
 				},
 			},
-		    {
-			    Name: "messageType",
-			    Type: proto.Typ {
-			        Name: proto.NewKind("Test2"),
-			    },
+			{
+				Name: "messageType",
+				Type: proto.Typ{
+					Name: proto.NewKind("TestField"),
+				},
 			},
 			{
-			    Name: "messageArrayType",
-			    Type: proto.Typ {
-			        Name:        proto.ArrayKind,
-			        ElementType: proto.NewKind("Test2"),
-			    },
+				Name: "messageArrayType",
+				Type: proto.Typ{
+					Name:        proto.ArrayKind,
+					ElementType: proto.NewKind("TestField"),
+				},
 			},
 			{
 				Name: "messageMapType",
-				Type: proto.Typ {
+				Type: proto.Typ{
 					Name:      proto.MapKind,
 					KeyType:   proto.StringKind,
-					ValueType: proto.NewKind("Test3"),
+					ValueType: proto.NewKind("TestField"),
 				},
 			},
 		},
 	})
 
-	if err := j2pManager.AddItem("testproto.proto", jss); err != nil {
+	desc := proto.JsonProtoDesc{
+		Pkg:          "common",
+		GoPkg:        "./json2prorobuf",
+		FieldSchemas: jss,
+	}
+	if err := j2pManager.AddItem("testproto.proto", desc); err != nil {
 		panic(err)
 	}
-	
 
 	str, err := j2pManager.Dump("testproto.proto")
 	if err != nil {

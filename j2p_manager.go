@@ -2,7 +2,6 @@ package json2prorobuf
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,7 +142,7 @@ func fillingFieldsPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number
 
 		appendField(msdIdx, field, *number, pref.MessageKind, pb)
 		pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].Label = descriptorpb.FieldDescriptorProto_Label(pref.Repeated).Enum()
-		pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String(".common." + *(pb.MessageType[msdIdx].Name) + "." + entryName)
+		pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String("." + *(pb.Package) + "." + *(pb.MessageType[msdIdx].Name) + "." + entryName)
 		pb.MessageType[msdIdx].NestedType = append(pb.MessageType[msdIdx].NestedType, &descriptorpb.DescriptorProto{
 			Name:  pbproto.String(entryName),
 			Field: []*descriptorpb.FieldDescriptorProto{},
@@ -165,13 +164,13 @@ func fillingFieldsPbSchema(msdIdx int, typ proto.Kind, field proto.Field, number
 		}
 		if mapValFlag {
 			appendNestedTypeField(msdIdx, "value", 2, pref.MessageKind, pb)
-			pb.MessageType[msdIdx].NestedType[len(pb.MessageType[msdIdx].NestedType)-1].Field[1].TypeName = pbproto.String(".common." + field.Type.ValueType.String())
+			pb.MessageType[msdIdx].NestedType[len(pb.MessageType[msdIdx].NestedType)-1].Field[1].TypeName = pbproto.String("." + *(pb.Package) + "." + field.Type.ValueType.String())
 			return nil
 		}
 		appendField(msdIdx, field, *number, pref.MessageKind, pb)
-		pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String(".common." + field.Type.Name.String())
+		pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String("." + *(pb.Package) + "." + field.Type.Name.String())
 		if arrayFlag {
-			pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String(".common." + field.Type.ElementType.String())
+			pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].TypeName = pbproto.String("." + *(pb.Package) + "." + field.Type.ElementType.String())
 			pb.MessageType[msdIdx].Field[len(pb.MessageType[msdIdx].Field)-1].Label = descriptorpb.FieldDescriptorProto_Label(pref.Repeated).Enum()
 		}
 		(*number)++
@@ -196,16 +195,16 @@ func fillingServicesPbSchema(service proto.JsonServiceSchema, pb *descriptorpb.F
 	}
 }
 
-func (jm *Json2PbParserManager) parser(fileName string, fieldSchema []proto.JsonFieldSchema, serviceSchema []proto.JsonServiceSchema) (pref.FileDescriptor, error) {
+func (jm *Json2PbParserManager) parser(fileName string, desc proto.JsonProtoDesc) (pref.FileDescriptor, error) {
 	pb := &descriptorpb.FileDescriptorProto{
 		Syntax:      pbproto.String("proto3"),
 		Name:        pbproto.String(fileName),
-		Package:     pbproto.String("common"),
+		Package:     pbproto.String(desc.Pkg),
 		MessageType: []*descriptorpb.DescriptorProto{},
 		Service:     []*descriptorpb.ServiceDescriptorProto{},
 	}
 
-	for msdIdx, s := range fieldSchema {
+	for msdIdx, s := range desc.FieldSchemas {
 		pb.MessageType = append(pb.MessageType, &descriptorpb.DescriptorProto{
 			Name:  pbproto.String(s.MsgName),
 			Field: []*descriptorpb.FieldDescriptorProto{},
@@ -219,9 +218,12 @@ func (jm *Json2PbParserManager) parser(fileName string, fieldSchema []proto.Json
 		}
 	}
 
-	for _, service := range serviceSchema {
-		fmt.Println("service!!!!!!!!!!")
+	for _, service := range desc.ServiceSchemas {
 		fillingServicesPbSchema(service, pb)
+	}
+
+	pb.Options = &descriptorpb.FileOptions{
+		GoPackage: pbproto.String(desc.GoPkg),
 	}
 
 	return protodesc.NewFile(pb, nil)
@@ -238,7 +240,8 @@ func (jm *Json2PbParserManager) Dump(fileName string) (string, error) {
 
 	dumpStr := ""
 	dumpStr += "syntax = \"proto3\";\n"
-	dumpStr += "package common;\n\n"
+	dumpStr += "package " + string(fd.Package().Name()) + ";\n\n"
+	dumpStr += "option go_package =\"" + fd.Options().(*descriptorpb.FileOptions).GetGoPackage() + "\";\n\n"
 
 	for idx := 0; idx < fd.Messages().Len(); idx++ {
 		msgName := fd.Messages().Get(idx).FullName()
@@ -285,11 +288,11 @@ func (jm *Json2PbParserManager) Dump(fileName string) (string, error) {
 	return dumpStr, nil
 }
 
-func (jm *Json2PbParserManager) AddItem(fileName string, fieldSchema []proto.JsonFieldSchema, serviceSchema []proto.JsonServiceSchema) error {
+func (jm *Json2PbParserManager) AddItem(fileName string, desc proto.JsonProtoDesc) error {
 	jm.lock.Lock()
 	defer jm.lock.Unlock()
 
-	fileDescriptor, err := jm.parser(fileName, fieldSchema, serviceSchema)
+	fileDescriptor, err := jm.parser(fileName, desc)
 	if err != nil {
 		return err
 	}

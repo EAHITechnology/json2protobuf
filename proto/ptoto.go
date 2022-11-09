@@ -50,3 +50,10 @@ type JsonServiceSchema struct {
 	Name         string        `json:"name"`
 	ServiceDescs []ServiceDesc `json:"service_desc"`
 }
+
+type JsonProtoDesc struct {
+	Pkg            string              `json:"pkg"`
+	GoPkg          string              `json:"go_pkg"`
+	FieldSchemas   []JsonFieldSchema   `json:"field_schema"`
+	ServiceSchemas []JsonServiceSchema `json:"service_schema"`
+}
